@@ -10,11 +10,20 @@ log = logging.getLogger('werkzeug')
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-@app.before_request
-def set_ingress_path():
-    ingress_path = request.headers.get('X-Ingress-Path', '')
-    request.environ['SCRIPT_NAME'] = ingress_path
-    request.environ['PATH_INFO'] = request.environ.get('PATH_INFO', '').removeprefix(ingress_path)
+class IngressMiddleware:
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        ingress_path = environ.get('HTTP_X_INGRESS_PATH', '')
+        if ingress_path:
+            environ['SCRIPT_NAME'] = ingress_path
+            path_info = environ.get('PATH_INFO', '')
+            if path_info.startswith(ingress_path):
+                environ['PATH_INFO'] = path_info[len(ingress_path):]
+        return self.wsgi_app(environ, start_response)
+
+app.wsgi_app = IngressMiddleware(app.wsgi_app)
 
 # --- Global paths and locks ---
 STATUS_FILE = None
