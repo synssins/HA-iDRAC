@@ -1,36 +1,46 @@
-# HA-iDRAC Project
+# HA iDRAC Controller
 
-This repository contains custom Home Assistant add-ons for managing and monitoring Dell PowerEdge servers via their iDRAC interface.
+Monitor and control Dell PowerEdge servers via iDRAC in Home Assistant. Supports iDRAC7 (IPMI), iDRAC8 (Redfish/IPMI), and iDRAC9 (Redfish) with automatic protocol detection.
+
+## Quick Install
+
+[![Add Repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fsynssins%2FHA-iDRAC)
+
+Click the button above to add this repository to your Home Assistant instance, then install the add-on from the Add-on Store.
+
+### Manual Install
+
+1. Go to **Settings > Add-ons > Add-on Store**
+2. Click **⋮ > Repositories**
+3. Add: `https://github.com/synssins/HA-iDRAC`
+4. Find **HA iDRAC Controller** in the store and click **Install**
 
 ## Available Add-ons
 
-1.  **HA iDRAC Controller (Stable)**
-    * Monitors key server metrics (CPU temperature, fan speeds, power consumption) and controls fan speeds based on CPU temperature.
-    * For detailed information, installation, and configuration, please see the [**Stable Add-on README](./ha-idrac-controller/README.md)**.
+### HA iDRAC Controller (Development)
 
-2.  **HA iDRAC Controller (Development Version)**
-    * **<font color="orange">⚠️ DEVELOPMENT VERSION - USE WITH CAUTION! ⚠️</font>**
-    * This is the active development version, including the latest features and bug fixes, but may also be unstable. Intended for testing and feedback.
-    * For detailed information, installation, and configuration, please see the [**Development Add-on README](./ha-idrac-controller-dev/README.md)**.
+Full-featured server monitoring and PIN-protected power control:
 
-## Adding this Repository to Home Assistant
+- **Monitoring** — CPU/GPU temps, fan RPMs, power draw, PSU health, drive health & SSD life, memory status, PCIe inventory, system health rollups
+- **Power Control** — On, Off, Restart, Power Cycle with PIN code security gate
+- **Fan Control** — Simple thresholds, multi-point curve, or PID target temperature (requires IPMI)
+- **Multi-Server** — manage multiple servers from one add-on instance
+- **Auto-Discovery** — all entities created automatically in Home Assistant via MQTT
 
-To install these add-ons:
+See the [Development Add-on README](./ha-idrac-controller-dev/README.md) for full documentation.
 
-1.  In Home Assistant, navigate to **Settings > Add-ons**.
-2.  Click on the **"ADD-ON STORE"** button.
-3.  Click the **three-dots menu (⋮)** in the top right and select **"Repositories"**.
-4.  Add the URL of this repository:
-    ```
-    [https://github.com/Aesgarth/HA-iDRAC](https://github.com/Aesgarth/HA-iDRAC)
-    ```
-5.  Click **"ADD"** and then **"CLOSE"**.
-6.  The add-ons from this repository will now be available in the store under the name specified in the `repository.yaml` file (e.g., "Aesgarth's Custom iDRAC Add-on"). Select the specific version you wish to install.
+### HA iDRAC Controller (Stable)
 
-## Issues and Contributions
+Legacy version with basic IPMI-only monitoring. See [Stable README](./ha-idrac-controller/README.md).
 
-Please report any issues or make contributions via the [GitHub Issues page](https://github.com/Aesgarth/HA-iDRAC/issues), clearly stating which version of the add-on you are using.
+## Supported Hardware
+
+| iDRAC | Servers | Protocol | Notes |
+|-------|---------|----------|-------|
+| **iDRAC9** | 14G+ (R740, R750) | Redfish | Full feature set |
+| **iDRAC8** | 13G (R730) | Redfish (FW 2.40+) / IPMI | Some Dell OEM endpoints may be limited |
+| **iDRAC7** | 12G (R720) | IPMI only | Basic monitoring, no drive/GPU/memory details |
 
 ## License
 
-This project and its components are under the [MIT License](./LICENSE).
+[MIT License](./LICENSE)

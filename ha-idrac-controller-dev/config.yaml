@@ -1,9 +1,7 @@
-# HA-iDRAC/ha-idrac-controller/config.yaml
-
 name: "HA iDRAC Controller BETA"
-version: "0.1.0-dev.13" # Incremented version
+version: "0.2.0-dev.1"
 slug: "ha_idrac_controller_development"
-description: "Control Dell iDRAC fan speeds and monitor server health in Home Assistant. Development Version. Not for production use."
+description: "Monitor and control Dell iDRAC servers in Home Assistant via Redfish API with IPMI fallback. Supports iDRAC7/8/9. Development Version."
 arch:
   - "aarch64"
   - "amd64"
@@ -18,8 +16,11 @@ panel_title: "iDRAC Control"
 panel_admin: true
 
 options:
-  # Master Key for encrypting server credentials stored in /data/servers_config.json
-  master_encryption_key: ""    # Secret
+  master_encryption_key: ""
+
+  # Power Control Security
+  power_control_pin: ""
+  power_unlock_timeout: 60
 
   # Default Fan Control Logic (can be overridden per server)
   temperature_unit: "C"
@@ -32,7 +33,7 @@ options:
   check_interval_seconds: 30
   log_level: "info"
 
-  # MQTT Configuration (Global for now)
+  # MQTT Configuration
   mqtt_host: "core-mosquitto"
   mqtt_port: 1883
   mqtt_username: ""
@@ -40,6 +41,10 @@ options:
 
 schema:
   master_encryption_key: "password"
+
+  # Power Control Security
+  power_control_pin: "password?"
+  power_unlock_timeout: "int(10,300)"
 
   # Default Fan Control Logic
   temperature_unit: "list(C|F)"

@@ -13,48 +13,68 @@
         {% if servers %}
             {% for server in servers %}
             <div class="container server-card">
-                <h2>{{ server.alias }} <small>({{ server.ip }})</small></h2>
-                <p><em>Last updated: <strong>{{ server.last_updated }}</strong></em></p>
-                
-                <div class="status-grid">
-                    <div><strong>Hottest CPU:</strong> {{ '%.1f'|format(server.hottest_cpu_temp_c) if server.hottest_cpu_temp_c is not none else 'N/A' }}°C</div>
-                    <div><strong>Inlet Temp:</strong> {{ '%.1f'|format(server.inlet_temp_c) if server.inlet_temp_c is not none else 'N/A' }}°C</div>
-                    <div><strong>Exhaust Temp:</strong> {{ '%.1f'|format(server.exhaust_temp_c) if server.exhaust_temp_c is not none else 'N/A' }}°C</div>
-                    <div><strong>Power:</strong> {{ server.power_consumption_watts if server.power_consumption_watts is not none else 'N/A' }} W</div>
-                    <div>
-                        <strong>Target Fan Speed:</strong> 
-                        {{ server.target_fan_speed_percent }}
-                        {% if server.target_fan_speed_percent is number %}%{% endif %}
+                <div class="server-header">
+                    <h2>{{ server.alias }} <small>{{ server.model or '' }}</small></h2>
+                    <div class="header-badges">
+                        <span class="badge {% if server.power_state == 'On' %}badge-ok{% else %}badge-off{% endif %}">{{ server.power_state or 'Unknown' }}</span>
+                        <span class="badge badge-backend">{{ server.backend or '?' }}</span>
+                        {% if server.health and server.health != 'OK' %}
+                        <span class="badge badge-warn">{{ server.health }}</span>
+                        {% elif server.health == 'OK' %}
+                        <span class="badge badge-ok">Healthy</span>
+                        {% endif %}
                     </div>
                 </div>
+                <p class="server-subtitle">{{ server.ip }} &mdash; Updated: {{ server.last_updated }}</p>
 
-                <h3>All CPU Temperatures</h3>
-                {% if server.cpu_temps_c %}
-                    <p class="temp-list">
-                    {% for temp in server.cpu_temps_c %}
-                        <span class="temp-badge">{{ temp }}°C</span>
-                    {% endfor %}
-                    </p>
-                {% else %}
-                    <p>No CPU temperature data available.</p>
-                {% endif %}
-
-                <h3>Actual Fan Speeds (RPM)</h3>
-                {% if server.actual_fan_rpms %}
-                    <ul class="fan-list">
-                    {% for fan in server.actual_fan_rpms %}
-                        <li><strong>{{ fan.name }}:</strong> {{ fan.rpm }} RPM</li>
-                    {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>No fan RPM data available.</p>
-                {% endif %}
+                <div class="status-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Hottest CPU</div>
+                        <div class="stat-value {% if server.hottest_cpu_temp_c is not none and server.hottest_cpu_temp_c >= 70 %}stat-warn{% endif %}">
+                            {{ '%.0f'|format(server.hottest_cpu_temp_c) if server.hottest_cpu_temp_c is not none else '—' }}<span class="stat-unit">°C</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Inlet</div>
+                        <div class="stat-value">{{ '%.0f'|format(server.inlet_temp_c) if server.inlet_temp_c is not none else '—' }}<span class="stat-unit">°C</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Exhaust</div>
+                        <div class="stat-value">{{ '%.0f'|format(server.exhaust_temp_c) if server.exhaust_temp_c is not none else '—' }}<span class="stat-unit">°C</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Power</div>
+                        <div class="stat-value">{{ server.power_consumption_watts if server.power_consumption_watts is not none else '—' }}<span class="stat-unit">W</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Fan Target</div>
+                        <div class="stat-value">
+                            {% if server.target_fan_speed_percent is not none and server.target_fan_speed_percent is number %}
+                                {{ server.target_fan_speed_percent }}<span class="stat-unit">%</span>
+                            {% else %}
+                                Auto
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if server.gpu_count %}
+                    <div class="stat-card">
+                        <div class="stat-label">GPUs</div>
+                        <div class="stat-value">{{ server.gpu_count }}</div>
+                    </div>
+                    {% endif %}
+                    {% if server.drive_count %}
+                    <div class="stat-card">
+                        <div class="stat-label">Drives</div>
+                        <div class="stat-value">{{ server.drive_count }}</div>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
             {% endfor %}
         {% else %}
             <div class="container">
                 <h2>No Server Data</h2>
-                <p>No server data is currently available. Check the add-on logs for more information.</p>
+                <p>No servers reporting. Add servers via <a href="servers">Manage Servers</a> and check the add-on logs.</p>
             </div>
         {% endif %}
     </div>
@@ -62,11 +82,22 @@
     <style>
         .main-container { max-width: 1200px; margin: 20px auto; }
         .server-card { margin-bottom: 2em; }
-        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1em; margin-bottom: 1em; }
-        .temp-list { display: flex; flex-wrap: wrap; gap: 8px; }
-        .temp-badge { background-color: var(--secondary-background-color); padding: 5px 10px; border-radius: 12px; font-size: 0.9em; }
-        .fan-list { column-count: 2; }
-        h2 small { font-size: 0.7em; color: var(--secondary-text-color); }
+        .server-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .server-header h2 { margin: 0; }
+        .server-subtitle { color: var(--secondary-text-color); font-size: 0.85em; margin: 4px 0 16px 0; }
+        h2 small { font-size: 0.6em; color: var(--secondary-text-color); margin-left: 8px; }
+        .header-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+        .badge { padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 500; }
+        .badge-ok { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+        .badge-off { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
+        .badge-warn { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+        .badge-backend { background: rgba(3, 169, 244, 0.15); color: var(--primary-color, #03a9f4); }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+        .stat-card { background: var(--secondary-background-color, rgba(255,255,255,0.05)); border-radius: 8px; padding: 12px; text-align: center; }
+        .stat-label { font-size: 0.75em; color: var(--secondary-text-color); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .stat-value { font-size: 1.6em; font-weight: 500; }
+        .stat-unit { font-size: 0.5em; color: var(--secondary-text-color); margin-left: 2px; }
+        .stat-warn { color: #f44336; }
     </style>
 </body>
 </html>

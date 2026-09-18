@@ -1,122 +1,156 @@
-# Home Assistant iDRAC Controller Add-on (Development Version)
+# HA iDRAC Controller
 
-**<font color="red">⚠️ DEVELOPMENT VERSION - USE WITH CAUTION! ⚠️</font>**
+Home Assistant add-on for Dell iDRAC server monitoring and power control via Redfish API with IPMI fallback.
 
-**This is a work-in-progress, development version of the HA iDRAC Controller add-on. It is intended for testing and feedback. Unexpected behavior or bugs are possible. Use this version at your own risk, as incorrect fan configuration could potentially lead to server overheating if not carefully monitored.**
+**DEVELOPMENT VERSION - USE WITH CAUTION.** Incorrect fan configuration could lead to server overheating if not carefully monitored.
 
 ---
 
-**Control multiple Dell PowerEdge servers' fan speeds and monitor key server metrics directly from a single instance in Home Assistant.**
+## Supported Hardware
 
-This add-on connects to your servers' iDRAC interfaces using IPMI to:
-* Read key metrics like temperatures (CPU, Inlet, Exhaust), fan speeds (RPM), and power consumption (Watts).
-* Monitor the status of individual Power Supply Units (PSUs) to detect power loss or hardware failure.
-* Provide advanced, per-server fan control with multiple modes.
-* Publish all data to MQTT for seamless integration with Home Assistant, creating sensors automatically via MQTT Discovery.
-* Provide a comprehensive Web UI (via Ingress) for a live status dashboard and full configuration of all connected servers.
+| iDRAC Generation | Servers | Protocol | Capabilities |
+|-----------------|---------|----------|-------------|
+| **iDRAC9** | 14G+ (R740, R750, etc) | Redfish (primary) | Full monitoring, power control, GPU sensors, drive health, memory status, PCIe inventory |
+| **iDRAC8** | 13G (R730, etc) | Redfish (FW 2.40+) / IPMI fallback | Monitoring + power control. Some Dell OEM endpoints may be unavailable on older firmware |
+| **iDRAC7** | 12G (R720, etc) | IPMI only | Basic monitoring (temps, fans, power, PSU status), fan control, power control. No drive/memory/GPU details |
+
+## Protocol Auto-Detection
+
+The add-on automatically detects the best available protocol per server:
+
+1. **Try Redfish** (`https://<idrac>/redfish/v1/`) — if it responds, use Redfish for all monitoring and power control
+2. **Try IPMI** — if Redfish is unavailable (iDRAC7 or Redfish disabled), fall back to IPMI via `ipmitool`
+3. **Both available** — Redfish used for monitoring/power, IPMI used for Dell-specific fan raw commands (manual fan speed control)
+
+Fan speed control (`0x30 0x30` raw commands) is **IPMI-only**. If IPMI is disabled on your iDRAC, fan control stays on Dell Auto.
 
 ## Features
 
-* **Multi-Server Support:** Monitor and control all your Dell PowerEdge servers from a single add-on instance.
-* **Advanced Fan Control:** Choose your preferred fan management mode on a per-server basis:
-    * **Simple Thresholds:** A 3-tier system (Base, High, Critical) for straightforward fan management.
-    * **Multi-Point Curve:** Define a custom temperature-to-fan-speed curve for smooth and granular control.
-    * **Target Temperature:** Set a desired CPU temperature, and the add-on will automatically adjust fan speeds to maintain it.
-* **Comprehensive Server Monitoring:** Creates a dedicated device in Home Assistant for each server with sensors for:
-    * Individual CPU Temperatures
-    * Hottest CPU Temperature
-    * Inlet & Exhaust Temperatures
-    * Individual Fan Speeds (RPM)
-    * Power Consumption (Watts)
-    * Target Fan Speed Percentage
-    * PSU Status (OK/Problem)
-    * Server Connectivity (Online/Offline)
-* **Remote Actions:**
-    * **Graceful Shutdown:** A "Shutdown Server" button is created for each server in Home Assistant.
-* **Web UI via Ingress:**
-    * View a live dashboard of all monitored servers.
-    * A dedicated "Manage Servers" page to add, edit, and delete servers and configure their fan control settings.
-* **MQTT Auto-Discovery:** Automatically creates and configures all entities in Home Assistant.
+### Monitoring
+- **Temperatures** — per-CPU, inlet, exhaust, GPU (iDRAC8/9)
+- **Fan Speeds** — per-fan RPM with health status
+- **Power** — current/average/peak/min watts, per-PSU health and input power
+- **Storage** — per-drive health, SSD media life %, SMART failure prediction, RAID controller status, cache battery state
+- **Memory** — per-DIMM health status
+- **GPU Sensors** — temperature, power draw, thermal alerts (Dell OEM, iDRAC8/9)
+- **System Health** — subsystem rollup status (CPU, storage, memory, fans, PSU, temperature, voltage)
+- **Power State** — server on/off as binary sensor
 
-## <font color="orange">⚠️ Important Note for Testers ⚠️</font>
-* This version is for active development. Please report any issues or bugs you encounter.
-* **Closely monitor your server's temperatures after configuring and enabling fan control.**
-* The developer is not responsible for any damage arising from the use of this development software.
+### Power Control (PIN-Protected)
+All power actions require unlocking a PIN-protected lock entity first:
+- **Power On** — turn server on
+- **Graceful Shutdown** — ACPI shutdown (clean OS shutdown)
+- **Force Power Off** — immediate power cut
+- **Graceful Restart** — ACPI restart
+- **Force Restart** — immediate hardware reset
+- **Power Cycle** — full power off then on
 
-## Prerequisites
+### Fan Control (requires IPMI)
+Three modes, configurable per-server:
+- **Simple Thresholds** — base/high/critical temperature tiers
+- **Multi-Point Curve** — custom temperature-to-fan-speed curve with linear interpolation
+- **Target Temperature (PID)** — automatic PID-controlled fan speed to maintain target CPU temp
 
-1.  **Dell PowerEdge Server with iDRAC:** The add-on uses IPMI, which is available on most Dell servers (iDRAC 7, 8, 9+ should work). Tested on an R720 with iDRAC7.
-2.  **Network Connectivity:** Your Home Assistant instance must be able to reach each server's iDRAC IP address.
-3.  **IPMI over LAN Enabled in iDRAC:** This is crucial for the add-on to function.
-    * Log in to your iDRAC's web interface.
-    * Navigate to **iDRAC Settings** -> **Network** (or **Connectivity**).
-    * Find the **IPMI Settings** section.
-    * Ensure **Enable IPMI Over LAN** is checked.
-    * Set the **Channel Privilege Level Limit** to **Administrator**.
-    * Save the settings.
-4.  **MQTT Broker:** You need an MQTT broker accessible by Home Assistant. The `core-mosquitto` add-on is recommended.
+### Multi-Server Support
+Monitor and control multiple servers from a single add-on instance. Each server gets its own HA device with all entities.
 
-## Installation
+## PIN Code Security
 
-1.  **Add the Repository to Home Assistant:**
-    * In Home Assistant, go to **Settings > Add-ons**.
-    * Click the **ADD-ON STORE** button.
-    * Click the **three-dots menu** (⋮) in the top right and select **Repositories**.
-    * Paste the following URL and click **ADD**:
-        ```
-        [https://github.com/Aesgarth/HA-iDRAC](https://github.com/Aesgarth/HA-iDRAC)
-        ```
-2.  **Install the Add-on:**
-    * Refresh the page. You should now see the "HA iDRAC Controller BETA" add-on in the store.
-    * Click on it and then click **INSTALL**.
+Power control actions (on/off/restart) require unlocking via PIN code:
+
+1. Set `power_control_pin` in add-on configuration (4-8 digits)
+2. In Home Assistant, find the **Power Control** lock entity for your server
+3. Enter PIN to unlock — power buttons become active
+4. After executing a power action OR timeout expiry, controls automatically re-lock
+5. If no PIN is configured, power controls work without authentication
+
+The PIN is validated server-side in the add-on. The lock entity uses HA's native PIN input UI via MQTT `code_format` and `command_template`.
 
 ## Configuration
 
-Configuration is now handled almost entirely through the add-on's Web UI.
+### Add-on Options
 
-1.  **Initial Add-on Setup:**
-    * Go to the add-on page (**Settings > Add-ons > HA iDRAC Controller BETA**).
-    * Switch to the **Configuration** tab.
-    * Fill in your **MQTT Broker** details.
-    * The fan speed and temperature thresholds on this page act as **global defaults** for newly added servers.
-    * Click **SAVE**.
+| Option | Default | Description |
+|--------|---------|-------------|
+| `power_control_pin` | *(empty)* | 4-8 digit PIN for power control. Leave empty to disable |
+| `power_unlock_timeout` | `60` | Seconds before power controls auto-lock (10-300) |
+| `check_interval_seconds` | `30` | Polling interval in seconds |
+| `log_level` | `info` | Logging verbosity (trace/debug/info/warning/error) |
+| `mqtt_host` | `core-mosquitto` | MQTT broker hostname |
+| `mqtt_port` | `1883` | MQTT broker port |
+| `mqtt_username` | *(empty)* | MQTT username |
+| `mqtt_password` | *(empty)* | MQTT password |
+| `temperature_unit` | `C` | Temperature display unit |
+| `base_fan_speed_percent` | `20` | Default fan speed in simple mode |
+| `low_temp_threshold` | `45` | Temperature for fan ramp-up |
+| `high_temp_fan_speed_percent` | `50` | Fan speed above threshold |
+| `critical_temp_threshold` | `65` | Temperature to revert to Dell auto fans |
 
-2.  **Adding Servers:**
-    * Go to the **Info** tab and **START** the add-on.
-    * Click **OPEN WEB UI**.
-    * Click the **Manage Servers** link.
-    * Use the "Add New Server" form to add your first server. The form will be pre-filled with the global defaults you just set.
-    * After adding or editing servers, a link will appear prompting you to restart the add-on. You **must restart the add-on** for your changes to take effect.
+### Per-Server Configuration
 
-## Web UI (Ingress Panel)
+Servers are configured via the add-on's web UI (ingress panel). Each server needs:
 
-The Web UI is the primary interface for this add-on:
-* **Dashboard:** Shows a live status overview for every enabled server. The page auto-refreshes.
-* **Manage Servers Page:** Allows you to add, edit, or delete your server configurations. When editing a server, you can select the desired fan control mode and configure its specific parameters.
+- **Alias** — friendly name (used in HA entity naming)
+- **iDRAC IP** — hostname or IP address
+- **Username/Password** — iDRAC credentials with Operator or Administrator rights
+- **Fan Control** — enable/disable, mode selection, thresholds
+
+## Polling Strategy
+
+To avoid overloading the iDRAC, polling uses two tiers:
+
+| Tier | Frequency | Data |
+|------|-----------|------|
+| **Fast** | Every interval (default 30s) | Thermal, power, GPU sensors, power state |
+| **Slow** | Every 10th cycle (~5 min) | Storage health, memory status, system info |
 
 ## Entities Created in Home Assistant
 
-For each server, the add-on will create a new device in Home Assistant with the following entities:
-* **Controls:**
-    * `button.idrac_server_alias_shutdown_server`
-* **Sensors:**
-    * `binary_sensor.idrac_server_alias_status` (Online/Offline)
-    * `binary_sensor.idrac_server_alias_psu_status` for each power supply.
-    * Numerous sensors for temperatures, fan speeds, and power usage.
+For each server, a device is created with:
 
-*(Entity IDs will be based on the unique alias you give each server).*
+**Sensors:** Hottest CPU temp, per-CPU temps, inlet/exhaust temps, power consumption (current/avg/peak/min), power capacity, per-fan RPMs, target fan speed, per-GPU temp & power, drive media life %, controller health & cache, total memory, system health rollups (CPU/storage/memory/fan/PSU/temp)
+
+**Binary Sensors:** Power state, per-PSU health, per-drive health, drive failure prediction, per-DIMM health, GPU thermal alerts
+
+**Buttons:** Power On, Graceful Shutdown, Force Off, Graceful Restart, Force Restart, Power Cycle
+
+**Lock:** Power Control (PIN-gated)
+
+## Architecture
+
+```
+┌─────────────┐     ┌──────────────────┐
+│  iDRAC 9    │◄────│  RedfishClient   │◄───┐
+│  (Redfish)  │     │  (HTTPS/JSON)    │    │
+└─────────────┘     └──────────────────┘    │     ┌──────────┐
+                                            ├────►│ MQTT     │───► Home Assistant
+┌─────────────┐     ┌──────────────────┐    │     │ (Auto-   │    (Sensors, Buttons,
+│  iDRAC 7    │◄────│  IPMIManager     │◄───┘     │  Disco)  │     Lock, Binary Sensors)
+│  (IPMI)     │     │  (ipmitool)      │          └──────────┘
+└─────────────┘     └──────────────────┘
+```
+
+Both backends expose the same interface. The main loop auto-detects Redfish vs IPMI per server. IPMI is used alongside Redfish when fan raw commands are needed.
+
+## Prerequisites
+
+1. **Dell PowerEdge Server** with iDRAC7, iDRAC8, or iDRAC9
+2. **iDRAC credentials** with Operator or Administrator privileges
+3. **Network access** from HA to iDRAC (HTTPS port 443 for Redfish, or IPMI-over-LAN for IPMI)
+4. **MQTT broker** — the `core-mosquitto` HA add-on is recommended
+5. For **Redfish**: ensure the Redfish service is enabled in iDRAC settings
+6. For **IPMI**: enable IPMI-over-LAN in iDRAC network settings
+7. For **fan control**: IPMI must be enabled (Redfish cannot send Dell fan raw commands)
 
 ## Troubleshooting
 
-* **Check the Add-on Log:** The first place to look for errors is the "Log" tab of the add-on. Set the "Log Level" to `debug` or `trace` in the Configuration tab for more detail.
-* **IPMI Errors:** Verify "IPMI over LAN" is enabled and that all credentials are correct for each server in the Web UI.
-* **MQTT Errors:** Check your MQTT credentials in the add-on's Configuration tab.
-* **Incorrect Sensor Data:** The regex patterns for parsing sensor data in `app/ipmi_manager.py` may need to be adjusted for your specific server model if you see incorrect or missing values.
-
-## Contributing / Reporting Issues
-
-This is a development version. Please report any bugs, issues, or feature suggestions by opening an issue on the [GitHub repository](https://github.com/Aesgarth/HA-iDRAC/issues). Please provide logs and details about your server model if you encounter problems.
+- **Check the Add-on Log** — set `log_level` to `debug` or `trace` for detail
+- **Redfish 401 errors** — verify iDRAC credentials and user permissions (Operator minimum)
+- **No storage/GPU data on iDRAC8** — older firmware may not support Dell OEM Redfish extensions. Update firmware if possible
+- **Fan control not working** — requires IPMI-over-LAN enabled. Check iDRAC network settings
+- **MQTT errors** — verify broker credentials in add-on configuration
+- **Power buttons don't work** — unlock the Power Control lock entity first (enter PIN)
 
 ## License
 
-This project uses the [MIT License](LICENSE).
+[MIT License](LICENSE)
