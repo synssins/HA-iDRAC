@@ -10,6 +10,12 @@ log = logging.getLogger('werkzeug')
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
+@app.before_request
+def set_ingress_path():
+    ingress_path = request.headers.get('X-Ingress-Path', '')
+    request.environ['SCRIPT_NAME'] = ingress_path
+    request.environ['PATH_INFO'] = request.environ.get('PATH_INFO', '').removeprefix(ingress_path)
+
 # --- Global paths and locks ---
 STATUS_FILE = None
 SERVERS_CONFIG_FILE = "/data/servers_config.json"
