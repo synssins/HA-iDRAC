@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Edit {{ server.alias }}</title>
-    <link rel="stylesheet" href="../../static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="main-container">
         <h1>Edit Server: {{ server.alias }}</h1>
-        <p><a href="../../servers">&laquo; Back to Server List</a></p>
+        <p><a href="{{ url_for('manage_servers') }}">&laquo; Back to Server List</a></p>
 
         <div class="container">
-            <form action="../update/{{ server.alias }}" method="POST">
+            <form action="{{ url_for('update_server', alias=server.alias) }}" method="POST">
                 
                 <div class="form-grid">
                     <div class="form-group"><label for="idrac_ip">iDRAC IP Address</label><input type="text" id="idrac_ip" name="idrac_ip" value="{{ server.idrac_ip }}" required></div>

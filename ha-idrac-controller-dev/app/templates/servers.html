@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Manage iDRAC Servers</title>
-    <link rel="stylesheet" href="static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="main-container">
         <h1>Manage iDRAC Servers</h1>
-        <p><a href="./">&laquo; Back to Dashboard</a></p>
+        <p><a href="{{ url_for('index') }}">&laquo; Back to Dashboard</a></p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -22,7 +22,7 @@
 
         <div class="container">
             <h2>Add New Server</h2>
-            <form action="servers/add" method="POST" class="form-grid">
+            <form action="{{ url_for('add_server') }}" method="POST" class="form-grid">
                 <div class="form-group">
                     <label for="alias">Alias</label>
                     <input type="text" id="alias" name="alias" placeholder="e.g., R720-Main" required>
@@ -88,8 +88,8 @@
                         <td>{{ server.idrac_ip }}</td>
                         <td>{{ server.idrac_username }}</td>
                         <td class="actions">
-                            <a href="servers/edit/{{ server.alias }}" class="button">Edit</a>
-                            <form action="servers/delete/{{ server.alias }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this server?');">
+                            <a href="{{ url_for('edit_server_form', alias=server.alias) }}" class="button">Edit</a>
+                            <form action="{{ url_for('delete_server', alias=server.alias) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this server?');">
                                 <button type="submit" class="destructive">Delete</button>
                             </form>
                         </td>

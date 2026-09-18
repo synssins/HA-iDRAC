@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>iDRAC Controller Dashboard</title>
-    <link rel="stylesheet" href="static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <meta http-equiv="refresh" content="15">
 </head>
 <body>
     <div class="main-container">
         <h1>HA iDRAC Controller Dashboard</h1>
-        <p><a href="servers">Manage Servers</a></p>
+        <p><a href="{{ url_for('manage_servers') }}">Manage Servers</a></p>
         {% if servers %}
             {% for server in servers %}
             <div class="container server-card">
@@ -74,7 +74,7 @@
         {% else %}
             <div class="container">
                 <h2>No Server Data</h2>
-                <p>No servers reporting. Add servers via <a href="servers">Manage Servers</a> and check the add-on logs.</p>
+                <p>No servers reporting. Add servers via <a href="{{ url_for('manage_servers') }}">Manage Servers</a> and check the add-on logs.</p>
             </div>
         {% endif %}
     </div>

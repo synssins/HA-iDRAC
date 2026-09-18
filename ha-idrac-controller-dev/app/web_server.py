@@ -1,5 +1,5 @@
 # HA-iDRAC/ha-idrac-controller-dev/app/web_server.py
-from flask import Flask, render_template, request, redirect, flash
+from flask import Flask, render_template, request, redirect, flash, url_for
 from markupsafe import Markup
 import os
 import json
@@ -63,7 +63,7 @@ def add_server():
     new_alias = request.form.get('alias')
     if any(s['alias'] == new_alias for s in servers):
         flash(f"Server alias '{new_alias}' already exists.", "error")
-        return redirect('servers') 
+        return redirect(url_for('manage_servers'))
 
     new_server = {
         "alias": new_alias,
@@ -80,7 +80,7 @@ def add_server():
     }
     servers.append(new_server)
     save_servers_config(servers)
-    return redirect('servers')
+    return redirect(url_for('manage_servers'))
     
 @app.route('/servers/edit/<alias>')
 def edit_server_form(alias):
@@ -94,7 +94,7 @@ def edit_server_form(alias):
         server_to_edit.setdefault('fan_control_enabled', True)
         return render_template('edit_server.html', server=server_to_edit)
     flash(f"Server '{alias}' not found.", "error")
-    return redirect('servers')
+    return redirect(url_for('manage_servers'))
 
 @app.route('/servers/update/<alias>', methods=['POST'])
 def update_server(alias):
@@ -102,7 +102,7 @@ def update_server(alias):
     server_to_update = next((s for s in servers if s['alias'] == alias), None)
     if not server_to_update:
         flash(f"Server '{alias}' not found.", "error")
-        return redirect('../../servers')
+        return redirect(url_for('manage_servers'))
 
     # Update base details
     server_to_update['idrac_ip'] = request.form.get('idrac_ip')
@@ -144,7 +144,7 @@ def update_server(alias):
     server_to_update['fan_curve'] = sorted(fan_curve, key=lambda p: p['temp'])
     
     save_servers_config(servers)
-    return redirect('../../servers')
+    return redirect(url_for('manage_servers'))
 
 @app.route('/servers/delete/<alias>', methods=['POST'])
 def delete_server(alias):
@@ -154,7 +154,7 @@ def delete_server(alias):
         save_servers_config(servers_to_keep)
     else:
         flash(f"Server '{alias}' not found.", "error")
-    return redirect('../servers')
+    return redirect(url_for('manage_servers'))
 
 def run_web_server(port, status_file_path, lock):
     global STATUS_FILE, status_lock
