@@ -1,103 +1,223 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>iDRAC Controller Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <meta http-equiv="refresh" content="15">
-</head>
-<body>
-    <div class="main-container">
-        <h1>HA iDRAC Controller Dashboard</h1>
-        <p><a href="{{ url_for('manage_servers') }}">Manage Servers</a></p>
-        {% if servers %}
-            {% for server in servers %}
-            <div class="container server-card">
-                <div class="server-header">
-                    <h2>{{ server.alias }} <small>{{ server.model or '' }}</small></h2>
-                    <div class="header-badges">
-                        <span class="badge {% if server.power_state == 'On' %}badge-ok{% else %}badge-off{% endif %}">{{ server.power_state or 'Unknown' }}</span>
-                        <span class="badge badge-backend">{{ server.backend or '?' }}</span>
-                        {% if server.health and server.health != 'OK' %}
-                        <span class="badge badge-warn">{{ server.health }}</span>
-                        {% elif server.health == 'OK' %}
-                        <span class="badge badge-ok">Healthy</span>
-                        {% endif %}
-                    </div>
-                </div>
-                <p class="server-subtitle">{{ server.ip }} &mdash; Updated: {{ server.last_updated }}</p>
+{% extends "base.html" %}
+{% block title %}iDRAC Dashboard{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
 
-                <div class="status-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">Hottest CPU</div>
-                        <div class="stat-value {% if server.hottest_cpu_temp_c is not none and server.hottest_cpu_temp_c >= 70 %}stat-warn{% endif %}">
-                            {{ '%.0f'|format(server.hottest_cpu_temp_c) if server.hottest_cpu_temp_c is not none else '—' }}<span class="stat-unit">°C</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Inlet</div>
-                        <div class="stat-value">{{ '%.0f'|format(server.inlet_temp_c) if server.inlet_temp_c is not none else '—' }}<span class="stat-unit">°C</span></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Exhaust</div>
-                        <div class="stat-value">{{ '%.0f'|format(server.exhaust_temp_c) if server.exhaust_temp_c is not none else '—' }}<span class="stat-unit">°C</span></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Power</div>
-                        <div class="stat-value">{{ server.power_consumption_watts if server.power_consumption_watts is not none else '—' }}<span class="stat-unit">W</span></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Fan Target</div>
-                        <div class="stat-value">
-                            {% if server.target_fan_speed_percent is not none and server.target_fan_speed_percent is number %}
-                                {{ server.target_fan_speed_percent }}<span class="stat-unit">%</span>
-                            {% else %}
-                                Auto
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% if server.gpu_count %}
-                    <div class="stat-card">
-                        <div class="stat-label">GPUs</div>
-                        <div class="stat-value">{{ server.gpu_count }}</div>
-                    </div>
-                    {% endif %}
-                    {% if server.drive_count %}
-                    <div class="stat-card">
-                        <div class="stat-label">Drives</div>
-                        <div class="stat-value">{{ server.drive_count }}</div>
-                    </div>
-                    {% endif %}
+{% block content %}
+<h1>Dashboard</h1>
+{% if servers %}
+    {% for server in servers %}
+    <div class="container server-card" data-alias="{{ server.alias }}">
+        <div class="server-header">
+            <h2>{{ server.alias }} <small>{{ server.model or '' }}</small></h2>
+            <div class="header-badges">
+                <span class="badge {% if server.power_state == 'On' %}badge-ok{% else %}badge-off{% endif %}">{{ server.power_state or 'Unknown' }}</span>
+                <span class="badge badge-backend">{{ server.backend or '?' }}</span>
+                {% if server.health and server.health != 'OK' %}
+                <span class="badge badge-warn">{{ server.health }}</span>
+                {% elif server.health == 'OK' %}
+                <span class="badge badge-ok">Healthy</span>
+                {% endif %}
+            </div>
+        </div>
+        <p class="server-subtitle">{{ server.ip }} &mdash; Updated: <span data-field="last_updated">{{ server.last_updated }}</span></p>
+
+        <div class="status-grid">
+            <div class="stat-card">
+                <div class="stat-label">Hottest CPU</div>
+                <div class="stat-value">
+                    <span data-field="hottest_cpu_temp_c">{{ '%.0f'|format(server.hottest_cpu_temp_c) if server.hottest_cpu_temp_c is not none else '—' }}</span><span class="stat-unit">&deg;C</span>
                 </div>
             </div>
-            {% endfor %}
-        {% else %}
-            <div class="container">
-                <h2>No Server Data</h2>
-                <p>No servers reporting. Add servers via <a href="{{ url_for('manage_servers') }}">Manage Servers</a> and check the add-on logs.</p>
+            <div class="stat-card">
+                <div class="stat-label">Inlet</div>
+                <div class="stat-value">
+                    <span data-field="inlet_temp_c">{{ '%.0f'|format(server.inlet_temp_c) if server.inlet_temp_c is not none else '—' }}</span><span class="stat-unit">&deg;C</span>
+                </div>
             </div>
-        {% endif %}
+            <div class="stat-card">
+                <div class="stat-label">Exhaust</div>
+                <div class="stat-value">
+                    <span data-field="exhaust_temp_c">{{ '%.0f'|format(server.exhaust_temp_c) if server.exhaust_temp_c is not none else '—' }}</span><span class="stat-unit">&deg;C</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Power</div>
+                <div class="stat-value">
+                    <span data-field="power_consumption_watts">{{ server.power_consumption_watts if server.power_consumption_watts is not none else '—' }}</span><span class="stat-unit">W</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Fan Target</div>
+                <div class="stat-value">
+                    <span data-field="target_fan_speed_percent">{% if server.target_fan_speed_percent is not none and server.target_fan_speed_percent is number %}{{ server.target_fan_speed_percent }}{% else %}Auto{% endif %}</span><span class="stat-unit" data-fan-unit>{% if server.target_fan_speed_percent is not none and server.target_fan_speed_percent is number %}%{% endif %}</span>
+                </div>
+            </div>
+            {% if server.gpu_count %}
+            <div class="stat-card">
+                <div class="stat-label">GPUs</div>
+                <div class="stat-value">{{ server.gpu_count }}</div>
+            </div>
+            {% endif %}
+            {% if server.drive_count %}
+            <div class="stat-card">
+                <div class="stat-label">Drives</div>
+                <div class="stat-value">{{ server.drive_count }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-container">
+                <canvas id="temp-{{ loop.index }}"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="power-{{ loop.index }}"></canvas>
+            </div>
+        </div>
     </div>
+    {% endfor %}
+{% else %}
+    <div class="container">
+        <h2>No Server Data</h2>
+        <p>No servers reporting. Add servers via <a href="{{ url_for('manage_servers') }}">Settings &raquo; Servers</a> and check the add-on logs.</p>
+    </div>
+{% endif %}
+{% endblock %}
 
-    <style>
-        .main-container { max-width: 1200px; margin: 20px auto; }
-        .server-card { margin-bottom: 2em; }
-        .server-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-        .server-header h2 { margin: 0; }
-        .server-subtitle { color: var(--secondary-text-color); font-size: 0.85em; margin: 4px 0 16px 0; }
-        h2 small { font-size: 0.6em; color: var(--secondary-text-color); margin-left: 8px; }
-        .header-badges { display: flex; gap: 6px; flex-wrap: wrap; }
-        .badge { padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 500; }
-        .badge-ok { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
-        .badge-off { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
-        .badge-warn { background: rgba(244, 67, 54, 0.2); color: #f44336; }
-        .badge-backend { background: rgba(3, 169, 244, 0.15); color: var(--primary-color, #03a9f4); }
-        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
-        .stat-card { background: var(--secondary-background-color, rgba(255,255,255,0.05)); border-radius: 8px; padding: 12px; text-align: center; }
-        .stat-label { font-size: 0.75em; color: var(--secondary-text-color); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .stat-value { font-size: 1.6em; font-weight: 500; }
-        .stat-unit { font-size: 0.5em; color: var(--secondary-text-color); margin-left: 2px; }
-        .stat-warn { color: #f44336; }
-    </style>
-</body>
-</html>
+{% block scripts %}
+<script>
+const HISTORY_URL = "{{ url_for('api_history') }}";
+const STATUS_URL = "{{ url_for('api_status') }}";
+
+Chart.defaults.color = '#9e9e9e';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = 'Roboto, Noto, sans-serif';
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+
+function makeOpts(title, scales) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { position: 'top' },
+            title: { display: true, text: title, color: '#ccc' }
+        },
+        scales: scales || {
+            x: { display: true, ticks: { maxTicksLimit: 8, maxRotation: 0 } },
+            y: { beginAtZero: false }
+        },
+        elements: { point: { radius: 0 }, line: { tension: 0.3, borderWidth: 2 } }
+    };
+}
+
+const tempCharts = {};
+const powerCharts = {};
+const serverAliases = [];
+
+document.querySelectorAll('.server-card').forEach(function(card, i) {
+    const alias = card.dataset.alias;
+    const idx = i + 1;
+    serverAliases.push(alias);
+
+    tempCharts[alias] = new Chart(document.getElementById('temp-' + idx), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'CPU', data: [], borderColor: '#f44336' },
+                { label: 'Inlet', data: [], borderColor: '#2196f3' },
+                { label: 'Exhaust', data: [], borderColor: '#ff9800' }
+            ]
+        },
+        options: makeOpts('Temperature (\u00B0C)')
+    });
+
+    powerCharts[alias] = new Chart(document.getElementById('power-' + idx), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'Power (W)', data: [], borderColor: '#4caf50', yAxisID: 'y' },
+                { label: 'Fan (%)', data: [], borderColor: '#00bcd4', yAxisID: 'y1' }
+            ]
+        },
+        options: makeOpts('Power & Fan', {
+            x: { display: true, ticks: { maxTicksLimit: 8, maxRotation: 0 } },
+            y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Watts', color: '#9e9e9e' } },
+            y1: { beginAtZero: true, max: 100, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '%', color: '#9e9e9e' } }
+        })
+    });
+});
+
+function formatTime(ts) {
+    var d = new Date(ts * 1000);
+    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+}
+
+function updateCharts(history) {
+    for (var i = 0; i < serverAliases.length; i++) {
+        var alias = serverAliases[i];
+        var data = history[alias];
+        if (!data || !data.length) continue;
+        var labels = data.map(function(d) { return formatTime(d.t); });
+
+        var tc = tempCharts[alias];
+        tc.data.labels = labels;
+        tc.data.datasets[0].data = data.map(function(d) { return d.cpu; });
+        tc.data.datasets[1].data = data.map(function(d) { return d.inlet; });
+        tc.data.datasets[2].data = data.map(function(d) { return d.exhaust; });
+        tc.update();
+
+        var pc = powerCharts[alias];
+        pc.data.labels = labels;
+        pc.data.datasets[0].data = data.map(function(d) { return d.power; });
+        pc.data.datasets[1].data = data.map(function(d) { return d.fan; });
+        pc.update();
+    }
+}
+
+function updateStats(statuses) {
+    for (var i = 0; i < statuses.length; i++) {
+        var s = statuses[i];
+        var card = document.querySelector('[data-alias="' + s.alias + '"]');
+        if (!card) continue;
+        card.querySelectorAll('[data-field]').forEach(function(el) {
+            var field = el.dataset.field;
+            var val = s[field];
+            if (field === 'target_fan_speed_percent') {
+                if (val != null && typeof val === 'number') {
+                    el.textContent = val;
+                    var unit = card.querySelector('[data-fan-unit]');
+                    if (unit) unit.textContent = '%';
+                } else {
+                    el.textContent = 'Auto';
+                    var unit = card.querySelector('[data-fan-unit]');
+                    if (unit) unit.textContent = '';
+                }
+            } else if (field === 'last_updated') {
+                if (val) el.textContent = val;
+            } else if (val != null && typeof val === 'number') {
+                el.textContent = Math.round(val);
+            } else if (val != null) {
+                el.textContent = val;
+            } else {
+                el.textContent = '\u2014';
+            }
+        });
+    }
+}
+
+function refresh() {
+    fetch(HISTORY_URL).then(function(r) { return r.json(); }).then(updateCharts).catch(function() {});
+    fetch(STATUS_URL).then(function(r) { return r.json(); }).then(updateStats).catch(function() {});
+}
+
+refresh();
+setInterval(refresh, 15000);
+</script>
+{% endblock %}
