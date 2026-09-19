@@ -1,5 +1,5 @@
 name: "HA iDRAC Controller BETA"
-version: "0.2.0-dev.5"
+version: "0.2.0-dev.6"
 slug: "ha_idrac_controller_development"
 description: "Monitor and control Dell iDRAC servers in Home Assistant via Redfish API with IPMI fallback. Supports iDRAC7/8/9. Development Version."
 arch:

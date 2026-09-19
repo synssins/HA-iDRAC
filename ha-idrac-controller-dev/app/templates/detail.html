@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}{{ server.alias }} - Details{% endblock %}
+
+{% block content %}
+<h1>{{ server.alias }} <small>{{ server.system_info.model or '' }}</small></h1>
+
+<div class="detail-grid">
+    <div class="container">
+        <h2>System Information</h2>
+        <div class="info-grid">
+            <div class="info-item"><span class="info-label">Model</span><span>{{ server.system_info.model or '—' }}</span></div>
+            <div class="info-item"><span class="info-label">Service Tag</span><span>{{ server.system_info.service_tag or '—' }}</span></div>
+            <div class="info-item"><span class="info-label">BIOS</span><span>{{ server.system_info.bios_version or '—' }}</span></div>
+            <div class="info-item"><span class="info-label">Hostname</span><span>{{ server.system_info.hostname or '—' }}</span></div>
+            <div class="info-item"><span class="info-label">Generation</span><span>{{ server.system_info.generation or '—' }}</span></div>
+            <div class="info-item"><span class="info-label">CPU</span><span>{{ server.system_info.cpu_model or '—' }} ({{ server.system_info.cpu_count or '?' }}x, {{ server.system_info.cpu_cores or '?' }} cores)</span></div>
+            <div class="info-item"><span class="info-label">Memory</span><span>{{ server.system_info.total_memory_gb or '—' }} GB ({{ server.system_info.populated_dimm_slots or '?' }}/{{ server.system_info.max_dimm_slots or '?' }} DIMMs)</span></div>
+            <div class="info-item"><span class="info-label">Power State</span><span class="badge {% if server.power_state == 'On' %}badge-ok{% else %}badge-off{% endif %}">{{ server.power_state or 'Unknown' }}</span></div>
+            <div class="info-item"><span class="info-label">Health</span><span class="badge {% if server.health == 'OK' %}badge-ok{% else %}badge-warn{% endif %}">{{ server.health or 'Unknown' }}</span></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Power Control</h2>
+        <div class="power-buttons">
+            <button onclick="powerAction('On')">Power On</button>
+            <button onclick="powerAction('GracefulRestart')">Graceful Restart</button>
+            <button onclick="powerAction('GracefulShutdown')" class="destructive">Graceful Shutdown</button>
+            <button onclick="powerAction('ForceRestart')" class="destructive">Force Restart</button>
+            <button onclick="powerAction('ForceOff')" class="destructive">Force Off</button>
+        </div>
+        <div id="pin-modal" style="display:none" class="modal-overlay">
+            <div class="modal-box">
+                <h3>Enter PIN to confirm</h3>
+                <input type="password" id="pin-input" placeholder="PIN" autocomplete="off">
+                <div class="modal-actions">
+                    <button onclick="confirmPower()">Confirm</button>
+                    <button onclick="cancelPower()" class="destructive">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <h2>Temperatures</h2>
+    <table class="detail-table">
+        <thead><tr><th>Sensor</th><th>Temperature</th></tr></thead>
+        <tbody>
+            {% for cpu in server.cpu_temps %}
+            <tr><td>{{ cpu.name }}</td><td>{{ cpu.temp }}&deg;C</td></tr>
+            {% endfor %}
+            <tr><td>Inlet</td><td>{{ server.inlet_temp_c if server.inlet_temp_c is not none else '—' }}&deg;C</td></tr>
+            <tr><td>Exhaust</td><td>{{ server.exhaust_temp_c if server.exhaust_temp_c is not none else '—' }}&deg;C</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="container">
+    <h2>Fans</h2>
+    <table class="detail-table">
+        <thead><tr><th>Fan</th><th>RPM</th><th>Health</th></tr></thead>
+        <tbody>
+            {% for fan in server.fans %}
+            <tr>
+                <td>{{ fan.name }}</td>
+                <td>{{ fan.rpm }}</td>
+                <td><span class="badge {% if fan.health == 'OK' %}badge-ok{% else %}badge-warn{% endif %}">{{ fan.health }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">No fan data</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="container">
+    <h2>Power</h2>
+    <div class="info-grid">
+        <div class="info-item"><span class="info-label">Current</span><span>{{ server.power_consumption_watts or '—' }} W</span></div>
+        <div class="info-item"><span class="info-label">Average</span><span>{{ server.power_avg_watts or '—' }} W</span></div>
+        <div class="info-item"><span class="info-label">Min</span><span>{{ server.power_min_watts or '—' }} W</span></div>
+        <div class="info-item"><span class="info-label">Max</span><span>{{ server.power_max_watts or '—' }} W</span></div>
+        <div class="info-item"><span class="info-label">Capacity</span><span>{{ server.power_capacity_watts or '—' }} W</span></div>
+    </div>
+    {% if server.psus %}
+    <h3>Power Supplies</h3>
+    <table class="detail-table">
+        <thead><tr><th>Name</th><th>Model</th><th>Input W</th><th>Output W</th><th>Capacity W</th><th>Voltage</th><th>Health</th><th>State</th></tr></thead>
+        <tbody>
+            {% for psu in server.psus %}
+            <tr>
+                <td>{{ psu.name }}</td>
+                <td>{{ psu.model or '—' }}</td>
+                <td>{{ psu.input_watts|round|int if psu.input_watts else '—' }}</td>
+                <td>{{ psu.output_watts|round|int if psu.output_watts else '—' }}</td>
+                <td>{{ psu.capacity_watts or '—' }}</td>
+                <td>{{ psu.line_input_voltage or '—' }}V</td>
+                <td><span class="badge {% if psu.health == 'OK' %}badge-ok{% else %}badge-warn{% endif %}">{{ psu.health }}</span></td>
+                <td>{{ psu.state }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+{% if server.gpus_detail %}
+<div class="container">
+    <h2>GPUs</h2>
+    <table class="detail-table">
+        <thead><tr><th>Name</th><th>GPU Temp</th><th>Mem Temp</th><th>Board Temp</th><th>Power (mW)</th><th>Thermal Alert</th></tr></thead>
+        <tbody>
+            {% for gpu in server.gpus_detail %}
+            <tr>
+                <td>{{ gpu.name }}</td>
+                <td>{{ gpu.temp_c if gpu.temp_c is not none else '—' }}&deg;C</td>
+                <td>{{ gpu.memory_temp_c if gpu.memory_temp_c is not none else '—' }}&deg;C</td>
+                <td>{{ gpu.board_temp_c if gpu.board_temp_c is not none else '—' }}&deg;C</td>
+                <td>{{ gpu.power_mw or '—' }}</td>
+                <td>{{ gpu.thermal_alert or '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if server.storage %}
+<div class="container">
+    <h2>Storage</h2>
+    {% if server.storage.controllers %}
+    <h3>Controllers</h3>
+    <table class="detail-table">
+        <thead><tr><th>Name</th><th>Firmware</th><th>Cache (MB)</th><th>Health</th></tr></thead>
+        <tbody>
+            {% for ctrl in server.storage.controllers %}
+            <tr>
+                <td>{{ ctrl.name }}</td>
+                <td>{{ ctrl.firmware or '—' }}</td>
+                <td>{{ ctrl.cache_mb or 0 }}</td>
+                <td><span class="badge {% if ctrl.health == 'OK' %}badge-ok{% else %}badge-warn{% endif %}">{{ ctrl.health }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+    {% if server.storage.drives %}
+    <h3>Drives</h3>
+    <table class="detail-table">
+        <thead><tr><th>Slot</th><th>Model</th><th>Capacity</th><th>Type</th><th>Protocol</th><th>Life Left</th><th>Health</th><th>RAID</th></tr></thead>
+        <tbody>
+            {% for drive in server.storage.drives %}
+            <tr>
+                <td>{{ drive.slot if drive.slot is not none else '—' }}</td>
+                <td>{{ drive.model or drive.name }}</td>
+                <td>{% if drive.capacity_bytes %}{{ (drive.capacity_bytes / 1000000000)|round|int }} GB{% else %}—{% endif %}</td>
+                <td>{{ drive.media_type or '—' }}</td>
+                <td>{{ drive.protocol or '—' }}</td>
+                <td>{% if drive.media_life_pct is not none %}{{ drive.media_life_pct }}%{% else %}—{% endif %}</td>
+                <td><span class="badge {% if drive.health == 'OK' %}badge-ok{% else %}badge-warn{% endif %}">{{ drive.health }}</span></td>
+                <td>{{ drive.raid_status or '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if server.memory %}
+<div class="container">
+    <h2>Memory ({{ server.memory.total_gb }} GB)</h2>
+    <table class="detail-table">
+        <thead><tr><th>DIMM</th><th>Size</th><th>Type</th><th>Speed</th><th>Manufacturer</th><th>Health</th></tr></thead>
+        <tbody>
+            {% for dimm in server.memory.dimms %}
+            <tr>
+                <td>{{ dimm.name }}</td>
+                <td>{{ dimm.size_gb }} GB</td>
+                <td>{{ dimm.type or '—' }}</td>
+                <td>{{ dimm.speed_mhz or '—' }} MHz</td>
+                <td>{{ dimm.manufacturer or '—' }}</td>
+                <td><span class="badge {% if dimm.health == 'OK' %}badge-ok{% else %}badge-warn{% endif %}">{{ dimm.health }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+var POWER_URL = "{{ url_for('api_power', alias=server.alias) }}";
+var hasPIN = {{ 'true' if has_pin else 'false' }};
+var pendingAction = null;
+
+function powerAction(action) {
+    if (!confirm('Execute power action: ' + action + '?')) return;
+    pendingAction = action;
+    if (hasPIN) {
+        document.getElementById('pin-modal').style.display = 'flex';
+        document.getElementById('pin-input').focus();
+    } else {
+        executePower('');
+    }
+}
+
+function confirmPower() {
+    var pin = document.getElementById('pin-input').value;
+    document.getElementById('pin-modal').style.display = 'none';
+    document.getElementById('pin-input').value = '';
+    executePower(pin);
+}
+
+function cancelPower() {
+    document.getElementById('pin-modal').style.display = 'none';
+    document.getElementById('pin-input').value = '';
+    pendingAction = null;
+}
+
+function executePower(pin) {
+    fetch(POWER_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: pendingAction, pin: pin})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) alert('Error: ' + data.error);
+        else if (data.success) alert('Power action executed successfully');
+        else alert('Power action failed');
+        pendingAction = null;
+    })
+    .catch(function() { alert('Request failed'); pendingAction = null; });
+}
+
+document.getElementById('pin-input').addEventListener('keyup', function(e) {
+    if (e.key === 'Enter') confirmPower();
+    if (e.key === 'Escape') cancelPower();
+});
+</script>
+{% endblock %}

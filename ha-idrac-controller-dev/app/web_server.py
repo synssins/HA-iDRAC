@@ -54,7 +54,7 @@ def record_history():
                         'inlet': s.get('inlet_temp_c'),
                         'exhaust': s.get('exhaust_temp_c'),
                         'power': s.get('power_consumption_watts'),
-                        'fan': s.get('target_fan_speed_percent'),
+                        'fan_rpm': s.get('avg_fan_rpm'),
                     })
         except Exception:
             pass
@@ -92,6 +92,23 @@ def index():
     all_statuses = load_all_servers_status()
     all_statuses.sort(key=lambda x: x.get('alias', ''))
     return render_template('index.html', servers=all_statuses, active_page='dashboard')
+
+@app.route('/server/<alias>')
+def server_detail(alias):
+    all_statuses = load_all_servers_status()
+    server = next((s for s in all_statuses if s.get('alias') == alias), None)
+    if not server:
+        flash(f"Server '{alias}' not found.", "error")
+        return redirect(url_for('index'))
+    server.setdefault('system_info', {})
+    server.setdefault('fans', [])
+    server.setdefault('cpu_temps', [])
+    server.setdefault('psus', [])
+    server.setdefault('gpus_detail', [])
+    server.setdefault('storage', None)
+    server.setdefault('memory', None)
+    has_pin = bool(global_config.get('power_control_pin'))
+    return render_template('detail.html', server=server, has_pin=has_pin, active_page='dashboard')
 
 @app.route('/servers')
 def manage_servers():
@@ -193,6 +210,23 @@ def api_history():
 @app.route('/api/status')
 def api_status():
     return jsonify(load_all_servers_status())
+
+@app.route('/api/power/<alias>', methods=['POST'])
+def api_power(alias):
+    from .redfish_client import RedfishClient
+    data = request.get_json()
+    action = data.get('action', '')
+    pin = data.get('pin', '')
+    expected_pin = global_config.get('power_control_pin', '')
+    if expected_pin and pin != expected_pin:
+        return jsonify({'error': 'Invalid PIN'}), 403
+    servers = load_servers_config()
+    server = next((s for s in servers if s['alias'] == alias), None)
+    if not server:
+        return jsonify({'error': 'Server not found'}), 404
+    client = RedfishClient(server['idrac_ip'], server['idrac_username'], server['idrac_password'])
+    result = client.power_action(action)
+    return jsonify({'success': result})
 
 def run_web_server(port, status_file_path, lock):
     global STATUS_FILE, status_lock

@@ -46,6 +46,8 @@ class ServerWorker:
         self.pid = PIDController()
         self.server_info = {}
         self.pcie_inventory = []
+        self.last_storage = None
+        self.last_memory = None
         self.cycle_count = 0
 
     def _log(self, level, msg):
@@ -246,11 +248,16 @@ class ServerWorker:
 
             self.mqtt.publish(self.mqtt.availability_topic, "online", retain=True)
 
-            storage, memory = None, None
+            storage, memory = self.last_storage, self.last_memory
             if self.cycle_count % HARDWARE_POLL_EVERY == 0:
                 storage, memory = self._poll_slow()
+                self.last_storage = storage
+                self.last_memory = memory
 
             target_fan = self._do_fan_control(thermal) if thermal else None
+
+            fan_rpms = [f["rpm"] for f in thermal.get("fans", []) if f.get("rpm")]
+            avg_fan_rpm = int(sum(fan_rpms) / len(fan_rpms)) if fan_rpms else None
 
             status = {
                 "system_info": self.server_info,
@@ -281,8 +288,20 @@ class ServerWorker:
                     "exhaust_temp_c": thermal.get("exhaust_temp"),
                     "power_consumption_watts": power.get("consumption_watts") if power else None,
                     "target_fan_speed_percent": target_fan,
+                    "avg_fan_rpm": avg_fan_rpm,
                     "gpu_count": len(gpus),
                     "drive_count": len(storage["drives"]) if storage else 0,
+                    "fans": thermal.get("fans", []),
+                    "cpu_temps": thermal.get("cpu_temps", []),
+                    "psus": power.get("psus", []) if power else [],
+                    "power_avg_watts": power.get("avg_watts") if power else None,
+                    "power_min_watts": power.get("min_watts") if power else None,
+                    "power_max_watts": power.get("max_watts") if power else None,
+                    "power_capacity_watts": power.get("capacity_watts") if power else None,
+                    "gpus_detail": gpus,
+                    "system_info": dict(self.server_info),
+                    "storage": storage,
+                    "memory": memory,
                 }
 
             self.cycle_count += 1
